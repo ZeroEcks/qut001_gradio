@@ -1,0 +1,21 @@
+# Development setup: the source folder is mounted into the container and uvicorn
+# restarts on save, so editing an app in apps/ refreshes the site without a rebuild.
+#
+# For a plain production-style run instead, drop the volumes and command:
+#   docker build -t gradio-hub . && docker run -p 7860:7860 gradio-hub
+
+services:
+  hub:
+    build: .
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./apps:/app/apps
+      - ./main.py:/app/main.py
+      - ./hub.py:/app/hub.py
+    environment:
+      SITE_TITLE: "Engineering Gradio Demos"
+      LOG_LEVEL: "INFO"
+    command: >
+      uvicorn main:app --host 0.0.0.0 --port 7860 --reload
+    restart: unless-stopped

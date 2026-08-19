@@ -1,0 +1,138 @@
+# Builds the container and publishes it to the GitHub Container Registry (GHCR).
+#
+# Every push to the default branch produces an image tagged with the Unix
+# timestamp of the build, for example:
+#
+#   ghcr.io/<owner>/<repo>:1785062712
+#   ghcr.io/<owner>/<repo>:latest
+#
+# The timestamp tag is immutable, so a demo that worked in week 3 can always be
+# run again later by pinning that exact tag. Because the value only increases,
+# sorting the tags numerically also sorts them by build order. "latest" always
+# follows the newest successful build on the default branch.
+#
+# No secrets need to be configured: GITHUB_TOKEN is provided automatically.
+# The package is private at first; make it public via
+# Repository -> Packages -> Package settings -> Change visibility.
+
+name: Build and publish container
+
+on:
+  push:
+    branches: [main]
+  # Pull requests build only, to catch a broken Dockerfile before it is merged.
+  pull_request:
+    branches: [main]
+  # Allows a manual run from the Actions tab.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # Unix seconds, always UTC by definition, so there is no timezone
+      # ambiguity between runs. The human-readable form is kept only for the
+      # run summary and image labels.
+      - name: Generate Unix timestamp tag
+        id: stamp
+        run: |
+          EPOCH=$(date -u +%s)
+          echo "epoch=$EPOCH" >> "$GITHUB_OUTPUT"
+          echo "human=$(date -u -d "@$EPOCH" +'%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+          echo "iso=$(date -u -d "@$EPOCH" +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      # GHCR requires a lowercase image name, but a GitHub owner or repository
+      # may contain capitals, so normalise it rather than assuming.
+      - name: Build lowercase image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Skipped for pull requests: a fork's token cannot write packages, and
+      # nothing should be published before review anyway.
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.stamp.outputs.epoch }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.stamp.outputs.iso }}
+            org.opencontainers.image.version=${{ steps.stamp.outputs.epoch }}
+          # Reuses layers from previous runs so that a change to apps/ does not
+          # reinstall the Python dependencies.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Confirms the published image actually serves the hub, rather than only
+      # confirming that it built. Uses the immutable timestamp tag.
+      - name: Smoke test the published image
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.stamp.outputs.epoch }}"
+          docker run -d --name hub-test -p 7860:7860 "$IMAGE"
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:7860/healthz > /tmp/health.json; then
+              echo "Health check passed on attempt $attempt."
+              cat /tmp/health.json
+              FAILED=$(python3 -c "import json;print(json.load(open('/tmp/health.json'))['apps_failed'])")
+              if [ "$FAILED" != "0" ]; then
+                echo "::warning::$FAILED app(s) failed to load. See the container logs below."
+                docker logs hub-test
+              fi
+              docker rm -f hub-test > /dev/null
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "The container never became healthy."
+          docker logs hub-test
+          docker rm -f hub-test > /dev/null
+          exit 1
+
+      - name: Summarise the run
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "### Image published"
+            echo
+            echo '```'
+            echo "docker pull ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.stamp.outputs.epoch }}"
+            echo '```'
+            echo
+            echo "Built ${{ steps.stamp.outputs.human }}"
+            echo
+            echo "| Tag | Purpose |"
+            echo "| --- | --- |"
+            echo "| \`${{ steps.stamp.outputs.epoch }}\` | Immutable, pin this for a specific class |"
+            echo "| \`latest\` | Newest build on \`main\` |"
+            echo "| \`${{ github.sha }}\` | Exact commit |"
+          } >> "$GITHUB_STEP_SUMMARY"
