@@ -128,7 +128,7 @@ def healthz() -> dict:
 
 
 for item in loaded_apps:
-    app = gr.mount_gradio_app(app, item.demo, path=f"/{item.slug}")
+    app = gr.mount_gradio_app(app, item.demo, path=f"/{item.slug}", css=item.css or None)
     logger.info("Mounted %-28s -> /%s", item.title, item.slug)
 
 if broken_apps:

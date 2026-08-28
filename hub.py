@@ -11,6 +11,11 @@ customise how it appears in the hub:
     DESCRIPTION -- one-line summary    (default: "")
     SLUG        -- URL path segment    (default: filename with _ replaced by -)
     ORDER       -- sort position       (default: 100, lower appears first)
+    CSS         -- custom stylesheet   (default: "", also accepts APP_CSS)
+
+The CSS is forwarded to ``gr.mount_gradio_app(..., css=...)`` because Gradio 6
+no longer honours ``css=`` passed to the ``gr.Blocks`` constructor when the app
+is mounted rather than launched.
 
 Modules whose names begin with ``_`` are skipped, which is how ``_template.py``
 stays out of the running site.
@@ -39,6 +44,7 @@ class LoadedApp:
     title: str
     description: str
     order: int
+    css: str
     demo: gr.Blocks
 
 
@@ -57,6 +63,21 @@ class BrokenApp:
 
 def _humanise(module_name: str) -> str:
     return module_name.replace("_", " ").title()
+
+
+def _discover_css(module: object, demo: gr.Blocks) -> str:
+    """Return the app's custom CSS, if it defines any.
+
+    Prefers a module-level ``CSS`` (or ``APP_CSS``) string so that apps don't
+    need to rely on the deprecated ``css=`` parameter of ``gr.Blocks``. Falls
+    back to whatever CSS the Blocks object still holds.
+    """
+    for name in ("CSS", "APP_CSS", "DEMO_CSS"):
+        css = getattr(module, name, None)
+        if isinstance(css, str) and css.strip():
+            return css
+    css = getattr(demo, "_deprecated_css", None) or getattr(demo, "css", None)
+    return css if isinstance(css, str) else ""
 
 
 def discover_apps() -> tuple[list[LoadedApp], list[BrokenApp]]:
@@ -96,6 +117,7 @@ def discover_apps() -> tuple[list[LoadedApp], list[BrokenApp]]:
                 title=getattr(module, "TITLE", _humanise(name)),
                 description=getattr(module, "DESCRIPTION", ""),
                 order=getattr(module, "ORDER", 100),
+                css=_discover_css(module, demo),
                 demo=demo,
             )
         )
