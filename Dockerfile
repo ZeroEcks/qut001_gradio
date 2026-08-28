@@ -24,6 +24,8 @@ RUN useradd --create-home --uid 1000 appuser \
     && chown -R appuser:appuser /app /tmp/gradio
 USER appuser
 
+RUN chmod 744 /app/apps/*.py
+
 EXPOSE 7860
 
 
