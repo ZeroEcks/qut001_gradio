@@ -281,6 +281,7 @@ with gr.Blocks(title="LLM Next-Token Prediction Demo") as demo:
 
     start_btn.click(
         fn=on_start,
+        concurrency_limit=int(os.getenv("LLM_CONCURRENCY", 1)),
         inputs=[prompt_input, top_k_input, max_steps_input],
         outputs=[
             bar_chart, token_table, generated_text,

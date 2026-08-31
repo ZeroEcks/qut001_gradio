@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -631,6 +632,7 @@ with gr.Blocks(title="What Does an AI Model See?") as demo:
 
     predict_button.click(
         fn=predict,
+        concurrency_limit=int(os.getenv("CHARACTER_CLASSIFICATION_CONCURRENCY", 1)),
         inputs=[drawing, preprocessing_mode, intention, previous_state],
         outputs=[
             model_input,
