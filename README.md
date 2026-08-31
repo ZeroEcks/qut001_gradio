@@ -88,6 +88,7 @@ Dockerfile is caught before it reaches `main`.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements-torch.txt
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
@@ -122,6 +123,7 @@ demo still runs.
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
+└── requirements-torch.txt
 ```
 
 Most of the time only `apps/` needs to change.

@@ -7,16 +7,23 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     GRADIO_TEMP_DIR=/tmp/gradio \
     EMNIST_MODEL_PATH=/model_weights       
-    
 
 WORKDIR /app
 
-# Dependencies are copied and installed before the source so that editing an app
-# does not invalidate the (slow) pip layer.
+# Copy the large model weights first so we can cache it, since this won't change much
+COPY model_weights /model_weights
+
+# Install pytorch (with a different index so it needs a separate file)
+COPY requirements-torch.txt .
+RUN pip install --no-cache-dir -r requirements-torch.txt
+
+# Install the rest of pypi dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY *.py .
+COPY apps/ .
+COPY qut001/ .
 
 # Run as an unprivileged user rather than root.
 RUN useradd --create-home --uid 1000 appuser \
@@ -27,7 +34,6 @@ USER appuser
 RUN chmod 744 /app/apps/*.py
 
 EXPOSE 7860
-
 
 # `curl` is not present in the slim image, so probe with the stdlib instead.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

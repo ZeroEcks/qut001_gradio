@@ -39,7 +39,9 @@ jobs:
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          lfs: true
 
       # Unix seconds, always UTC by definition, so there is no timezone
       # ambiguity between runs. The human-readable form is kept only for the
