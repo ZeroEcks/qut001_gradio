@@ -99,6 +99,7 @@ uvicorn main:app --reload
 | --- | --- | --- |
 | `SITE_TITLE` | `Engineering Gradio Demos` | Heading on the home page. |
 | `LOG_LEVEL` | `INFO` | Python logging level. |
+| `MODEL_WEIGHTS_DIR` | `./model_weights` | Location of the model weights directory. |
 
 ## Dependencies
 
