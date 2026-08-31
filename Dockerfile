@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Copy the large model weights first so we can cache it, since this won't change much
-COPY model_weights /model_weights
+COPY model_weights /
 
 # Install pytorch (with a different index so it needs a separate file)
 COPY requirements-torch.txt .
@@ -21,17 +21,16 @@ RUN pip install --no-cache-dir -r requirements-torch.txt
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY *.py .
-COPY apps/ .
-COPY qut001/ .
+COPY *.py ./
+COPY apps/ ./apps
+COPY qut001/ ./qut001
 
 # Run as an unprivileged user rather than root.
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /tmp/gradio \
-    && chown -R appuser:appuser /app /tmp/gradio
+    && chown -R appuser:appuser /app /tmp/gradio \
+    && chmod 744 -R /app
 USER appuser
-
-RUN chmod 744 /app/apps/*.py
 
 EXPOSE 7860
 
