@@ -9,12 +9,30 @@ from __future__ import annotations
 import html
 import logging
 import os
+import resource
 
 import gradio as gr
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from hub import BrokenApp, LoadedApp, discover_apps
+
+def enforce_container_memory_limit():
+    # Sets the memory limit to the cgroup (or container) limit to prevent OOM kills
+    # and instead return MemoryError.
+    cgroup_v2_path = "/sys/fs/cgroup/memory.max"
+    limit_bytes = None
+
+    if os.path.exists(cgroup_v2_path):
+        with open(cgroup_v2_path, "r") as f:
+            val = f.read().strip()
+            if val != "max":  # "max" means no specific limit is set
+                limit_bytes = int(val)
+
+    if limit_bytes:
+        allowed_mem = int(limit_bytes * 0.95) # use 95% of allocated memory
+        resource.setrlimit(resource.RLIMIT_AS, (allowed_mem, allowed_mem))
+        print(f"Python memory limit locked to cgroup maximum: {allowed_mem // (1024**2)} MB")
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
