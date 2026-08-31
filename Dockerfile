@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     GRADIO_TEMP_DIR=/tmp/gradio \
-    EMNIST_MODEL_PATH=/model_weights       
+    MODEL_WEIGHTS_DIR=/model_weights       
 
 WORKDIR /app
 
