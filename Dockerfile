@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Copy the large model weights first so we can cache it, since this won't change much
-COPY model_weights /
+COPY model_weights /model_weights
 
 # Install pytorch (with a different index so it needs a separate file)
 COPY requirements-torch.txt .
